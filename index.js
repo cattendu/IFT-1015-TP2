@@ -128,27 +128,43 @@ var MILLIS_PER_DAY = (24 * 60 * 60 * 1000);
 // Doit retourner false si le calendrier demandé n'existe pas
 var getCalendar = function (pollId) {
     var poll = getPoll(pollId);
-    if(poll == null) return getTemplate("error404");
+    if(poll == null) return false;
 
     var title = poll.title;
-    var table = "INSERT TABLE HERE";
+    //var table = getTable(poll);
     var url = hostUrl + poll.id;
 
     var data = [
         {lookup:"{{titre}}", replacement:title},
-        {lookup:"{{table}}", replacement:table},
+        {lookup:"{{table}}", replacement:"table"},
         {lookup:"{{url}}", replacement:url},
     ];
     var calendar = getTemplate("calendar");
     return populateTemplate(calendar, data);
 };
+
 var getTemplate = function(file){
     return readFile("template/" + file + ".html");
 };
+
 var populateTemplate = function(template, data){
     return data.reduce(function(template, entry){
         return template.split(entry.lookup).join(entry.replacement);
     }, template);
+};
+var getTable = function(poll){
+    //var nbHours
+    //var nbDays = poll;
+    /*var table = `<table id='calendrier'
+                    onmousedown="onClick(event)"
+                    onmouseover="onMove(event)"
+                    data-nbjours="6"
+                    data-nbheures="11">
+
+    `*/
+
+
+    return table;
 };
 //------------------------------------------------------------------------------
 // Retourne le texte HTML à afficher à l'utilisateur pour voir les
@@ -217,15 +233,22 @@ var isSpecial = function(char){
     return char == "-";
 };
 var isValidDate = function(start, end){
-    var maxLength = 30; //max poll length is 30 days
-    var dateStart = new Date(start);
-    var dateEnd = new Date(end);
-    var elapsed = dateEnd-dateStart; //milliseconds elapsed between two dates
-
-    return elapsed >= 0 && elapsed <= maxLength*MILLIS_PER_DAY;
+    var maxDays = 30; //max poll length is 30 days
+    var elapsed = daysElapsed(start, end);
+    return elapsed >= 0 && elapsed < maxDays;
 };
 var isValidTime = function(start, end){
     return +start <= +end;
+};
+//number of elapsed days between two dates
+var daysElapsed = function(start, end){
+    var dateStart = new Date(start);
+    var dateEnd = new Date(end);
+    return (dateEnd-dateStart)/MILLIS_PER_DAY;
+};
+//number of elapsed hours between two times
+var timeElapsed = function(start, end){
+    return end - start;
 };
 //------------------------------------------------------------------------------
 var test = function(){
