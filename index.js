@@ -1,3 +1,7 @@
+//Questions for TP2:
+//ID allows empty strings? Min length
+//Dates not before today?
+
 'use strict';
 
 var http = require("http");
@@ -107,22 +111,32 @@ var getIndex = function (replacements) {
 
 // --- À compléter ---
 
+var polls = [];
+
 var mois = [
     'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
     'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Dec'
 ];
 
-var MILLIS_PAR_JOUR = (24 * 60 * 60 * 1000);
-
+var MILLIS_PER_DAY = (24 * 60 * 60 * 1000);
+//------------------------------------------------------------------------------
 // Retourne le texte HTML à afficher à l'utilisateur pour répondre au
 // sondage demandé.
 //
 // Doit retourner false si le calendrier demandé n'existe pas
-var getCalendar = function (sondageId) {
-    // TODO
-    return 'Calendrier <b>' + sondageId + '</b> (TODO)';
+var getCalendar = function (pollId) {
+    if(!pollExists(pollId))
+        return "not found"; //TODO
+    return 'Calendrier <b>' + pollId + '</b> (TODO)';
 };
-
+//Checks if poll exists in recorded polls based on its id
+var pollExists = function(id){
+    for(var i = 0; i < polls.length; i++){
+        if(polls[i].id == id) return true;
+    }
+    return false;
+};
+//------------------------------------------------------------------------------
 // Retourne le texte HTML à afficher à l'utilisateur pour voir les
 // résultats du sondage demandé
 //
@@ -136,9 +150,73 @@ var getResults = function (sondageId) {
 //
 // Doit retourner false si les informations ne sont pas valides, ou
 // true si le sondage a été créé correctement.
-var creerSondage = function(titre, id, dateDebut, dateFin, heureDebut, heureFin) {
-    // TODO
+var creerSondage = function(title, id, dateStart, dateEnd, timeStart, timeEnd) {
+    if(isValidId(id) &&
+       isValidDate(dateStart, dateEnd) &&
+       isValidTime(timeStart, timeEnd)){
+           //Add poll to database
+            polls.push({
+               title: title,
+               id: id,
+               dateStart: dateStart,
+               dateEnd: dateEnd,
+               timeStart: timeStart,
+               timeEnd: timeEnd
+           });
+           return true;
+       }
+    return false;
+};
+
+//------------------------------------------------------------------------------
+//ID is valid if it contains only letters numbers and allowed special characters
+//Must be of length > 0
+var isValidId = function(id){
+    if(id.length == 0) return false;
+
+    for(var i = 0; i < id.length; i++){
+        var char = id.charAt(i);
+        if(isLetter(char) || isNumber(char) || isSpecial(char))
+            continue;
+        return false;
+    }
     return true;
+};
+var isLetter = function(char){
+    return (char >= "a" && char <= "z") ||
+           (char >= "A" && char <= "Z");
+};
+var isNumber = function(char){
+    if(char == " ") return false; //space is converted to 0 by unary operator +
+    return +char == +char;
+};
+var isSpecial = function(char){
+    return char == "-";
+};
+var isValidDate = function(start, end){
+    var maxLength = 30; //max poll length is 30 days
+    var dateStart = new Date(start);
+    var dateEnd = new Date(end);
+    var elapsed = dateEnd-dateStart; //milliseconds elapsed between two dates
+
+    return elapsed >= 0 && elapsed <= maxLength*MILLIS_PER_DAY;
+};
+var isValidTime = function(start, end){
+    return +start <= +end;
+};
+//------------------------------------------------------------------------------
+var test = function(){
+    //isValidID
+    if(
+        !(
+        isValidId("") == false &&
+        isValidId(" ") == false &&
+        isValidId("%212") == false &&
+        isValidId("dsa dAA1") == false &&
+        isValidId("\"dsadAA1\"") == false &&
+        isValidId("dD3-2aa") == true
+        )
+    ) console.log("isValidID Failed!");
 };
 
 // Ajoute un participant et ses disponibilités aux résultats d'un
@@ -234,3 +312,5 @@ http.createServer(function (requete, reponse) {
     sendPage(reponse, doc);
 
 }).listen(port);
+
+test();
