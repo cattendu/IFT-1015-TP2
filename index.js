@@ -1,6 +1,7 @@
 //Questions for TP2:
 //ID allows empty strings? Min length
 //Dates not before today?
+//creerSondage/MILLIS_PER_DAY renaming
 
 'use strict';
 
@@ -76,7 +77,7 @@ var indexQuery = function (query) {
         if ('id' in query && 'titre' in query &&
             query.id.length > 0 && query.titre.length > 0) {
 
-            resultat.exists = creerSondage(
+            resultat.exists = createPoll(
                 query.titre, query.id,
                 query.dateDebut, query.dateFin,
                 query.heureDebut, query.heureFin);
@@ -108,8 +109,9 @@ var getIndex = function (replacements) {
     };
 };
 
-
-// --- À compléter ---
+//------------------------------------------------------------------------------
+//----------------------------- TP2 BEGIN --------------------------------------
+//------------------------------------------------------------------------------
 
 var polls = [];
 
@@ -125,16 +127,28 @@ var MILLIS_PER_DAY = (24 * 60 * 60 * 1000);
 //
 // Doit retourner false si le calendrier demandé n'existe pas
 var getCalendar = function (pollId) {
-    if(!pollExists(pollId))
-        return "not found"; //TODO
-    return 'Calendrier <b>' + pollId + '</b> (TODO)';
+    var poll = getPoll(pollId);
+    if(poll == null) return getTemplate("error404");
+
+    var title = poll.title;
+    var table = "INSERT TABLE HERE";
+    var url = hostUrl + poll.id;
+
+    var data = [
+        {lookup:"{{titre}}", replacement:title},
+        {lookup:"{{table}}", replacement:table},
+        {lookup:"{{url}}", replacement:url},
+    ];
+    var calendar = getTemplate("calendar");
+    return populateTemplate(calendar, data);
 };
-//Checks if poll exists in recorded polls based on its id
-var pollExists = function(id){
-    for(var i = 0; i < polls.length; i++){
-        if(polls[i].id == id) return true;
-    }
-    return false;
+var getTemplate = function(file){
+    return readFile("template/" + file + ".html");
+};
+var populateTemplate = function(template, data){
+    return data.reduce(function(template, entry){
+        return template.split(entry.lookup).join(entry.replacement);
+    }, template);
 };
 //------------------------------------------------------------------------------
 // Retourne le texte HTML à afficher à l'utilisateur pour voir les
@@ -150,24 +164,33 @@ var getResults = function (sondageId) {
 //
 // Doit retourner false si les informations ne sont pas valides, ou
 // true si le sondage a été créé correctement.
-var creerSondage = function(title, id, dateStart, dateEnd, timeStart, timeEnd) {
+var createPoll = function(title, id, dateStart, dateEnd, timeStart, timeEnd) {
     if(isValidId(id) &&
        isValidDate(dateStart, dateEnd) &&
        isValidTime(timeStart, timeEnd)){
-           //Add poll to database
-            polls.push({
-               title: title,
-               id: id,
-               dateStart: dateStart,
-               dateEnd: dateEnd,
-               timeStart: timeStart,
-               timeEnd: timeEnd
-           });
+           addPoll(title, id, dateStart, dateEnd, timeStart, timeEnd);
            return true;
        }
     return false;
 };
-
+//Adds new poll to global variable polls
+var addPoll = function(title, id, dateStart, dateEnd, timeStart, timeEnd){
+    polls.push({
+       title: title,
+       id: id,
+       dateStart: dateStart,
+       dateEnd: dateEnd,
+       timeStart: timeStart,
+       timeEnd: timeEnd
+    });
+};
+//Retrieve information from saved poll
+var getPoll = function(id){
+    for(var i = 0; i < polls.length; i++){
+        if(polls[i].id == id) return polls[i];
+    }
+    return null;
+};
 //------------------------------------------------------------------------------
 //ID is valid if it contains only letters numbers and allowed special characters
 //Must be of length > 0
