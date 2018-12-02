@@ -134,24 +134,29 @@ var getCalendar = function (pollId) {
     var table = getTable(poll);
     var url = hostUrl + poll.id;
 
+    //Variables in calendar template and their actual values
     var data = [
-        {lookup:"{{titre}}", replacement:title},
-        {lookup:"{{table}}", replacement:table},
-        {lookup:"{{url}}", replacement:url},
+        {lookup: "{{titre}}", value: title},
+        {lookup: "{{table}}", value: table},
+        {lookup: "{{url}}"  , value: url}
     ];
     var calendar = getTemplate("calendar");
     return populateTemplate(calendar, data);
 };
 
+//returns a template's HTML as a string
 var getTemplate = function(file){
     return readFile("template/" + file + ".html");
 };
 
+//Searches a template and replaces its variables by their values
 var populateTemplate = function(template, data){
     return data.reduce(function(template, entry){
-        return template.split(entry.lookup).join(entry.replacement);
+        return template.split(entry.lookup).join(entry.value);
     }, template);
 };
+
+//Produces the HTML for the poll input table
 var getTable = function(poll){
     var nbDays = getElapsedDays(poll.dateStart, poll.dateEnd) + 1;
     var nbHours = getElapsedTime(poll.timeStart, poll.timeEnd) + 1;
