@@ -217,7 +217,7 @@ var getResults = function (pollId) {
     var url = hostUrl + poll.id;
     var legend = getLegend(poll);
 
-    //Variables in calendar template and their actual values
+    //Variables in results template and their actual values
     var data = [
         {lookup: "{{titre}}",   value: title},
         {lookup: "{{table}}",   value: table},
@@ -225,16 +225,79 @@ var getResults = function (pollId) {
         {lookup: "{{legende}}", value: legend}
     ];
 
-    
     var results = getTemplate("results");
     return populateTemplate(results, data);
 };
 
 var getResultsTable = function(poll){
+    var nbDays = getElapsedDays(poll.dateStart, poll.dateEnd) + 1;
+    var nbHours = getElapsedTime(poll.timeStart, poll.timeEnd) + 1;
 
+    var table  = '<table>';
+
+    //<table>HERE</table>
+        table += getResRows(nbDays, nbHours, poll.dateStart,
+                            poll.timeStart, poll.participants);
+
+    //... </table>
+        table += "</table>";
+
+    return table;
 };
-var getLegend = function(){
+//Produces the all calendar table rows including header
+var getResRows = function(nbDays, nbHours, dateStart, timeStart, participants){
+    var rows = [];
+    rows.push(getResHeader(nbDays, dateStart));
+    for(var i = 0; i < nbHours; i++){
+        rows.push(getResRow(nbDays, timeStart, i, participants));
+    }
+    return rows.join("");
+};
+//Produces a single calendar table row
+var getResRow = function(nbDays, timeStart, i, participants){
+    var row = "<tr><th>" + (+timeStart + i) + "h</th>";
+    for(var j = 0; j < nbDays; j++){
+        row += "<td>" + addColorIndicators(i,j,nbDays,participants) + "</td>";
+    }
+    return row;
+};
+//Produces the calendar table header 
+var getResHeader = function(nbDays, dateStart){
+    var header = "<tr><th></th>";
+    for(var i = 0; i < nbDays; i++){
+        var date = new Date(dateStart).addDays(i);
+        var day = date.getUTCDate();
+        var month = months[date.getUTCMonth()];
+        header += "<th>" + day + " " + month + "</th>";
+    }
+    header += "</tr>";
 
+    return header;
+};
+var addColorIndicators = function(i,j,nbDays,participants){
+    var colors = "";
+
+    participants.forEach(function(p,k){
+        if(checkAvailability(i,j,nbDays, p.availabilities)){
+            var color = genColor(k, participants.length);
+            colors += "<span style='background-color: " + color + "; color:"+ color +"'>.</span>";
+        }
+    });
+    return colors;
+};
+var getLegend = function(poll){
+    var legend = "<ul>";
+    poll.participants.map(function(p,i){
+        var color = genColor(i, poll.participants.length);
+        legend += "<li style='background-color: " + color + "'>" + p.name + "</li>"; 
+    });
+    legend += "</ul>";
+    return legend;
+};
+
+//Returns true if a participant was available for that time period
+var checkAvailability = function(i,j, nbDays, participation){
+    return participation.charAt(i*nbDays + j) == "1";
 };
 
 //https://stackoverflow.com/questions/563406/add-days-to-javascript-date
@@ -348,11 +411,21 @@ var ajouterParticipant = function(pollId, name, availabilities) {
 // toutes les couleurs et les afficher devrait donner un joli dégradé qui
 // commence en rouge, qui passe par toutes les autres couleurs et qui
 // revient à rouge.
-var genColor = function(i, nbTotal) {
-    // TODO
-    return '#000000';
-};
+var genColor = function(i, nbColors) {
+    var h = i*6/nbColors;
+    var x = i%2 ? "00" : "B7";
+    var c = "B7";
 
+    switch(Math.floor(h)){
+        case 0:  return "#" + c + x + "00";
+        case 1:  return "#" + x + c + "00";
+        case 2:  return "#" + "00" + c + x;
+        case 3:  return "#" + "00" + x + c;
+        case 4:  return "#" + x + "00" + c;
+        case 5:  return "#" + c + "00" + x;
+        default: return "#000000";
+    }
+};
 
 /*
  * Création du serveur HTTP
