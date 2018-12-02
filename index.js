@@ -162,11 +162,11 @@ var getTable = function(poll){
     var nbHours = getElapsedTime(poll.timeStart, poll.timeEnd) + 1;
 
     //<table ...
-    var table  = '<table id="calendrier"';
+    var table  = '<table id="calendar"';
         table += 'onmousedown="onClick(event)"';
         table += 'onmouseover="onMove(event)"';
-        table += 'data-nbjours="' + nbDays + '"';
-        table += 'data-nbheures="' + nbHours + '">';
+        table += 'data-nbdays="' + nbDays + '"';
+        table += 'data-nbhours="' + nbHours + '">';
     // ..>
 
     //<table>HERE</table>
@@ -306,7 +306,6 @@ var test = function(){
         isValidId(" ") == false &&
         isValidId("%212") == false &&
         isValidId("dsa dAA1") == false &&
-        isValidId("\"dsadAA1\"") == false &&
         isValidId("dD3-2aa") == true
         )
     ) console.log("isValidID Failed!");
@@ -318,7 +317,7 @@ var test = function(){
 //
 // Cette fonction ne retourne rien
 var ajouterParticipant = function(sondageId, nom, disponibilites) {
-    // TODO
+    console.log(sondageId + " " + nom + " " + disponibilites);
 };
 
 // Génère la `i`ème couleur parmi un nombre total `total` au format
