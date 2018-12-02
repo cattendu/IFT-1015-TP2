@@ -121,7 +121,19 @@ var months = [
 ];
 
 var MILLIS_PER_DAY = (24 * 60 * 60 * 1000);
+
 //------------------------------------------------------------------------------
+//returns a template's HTML as a string
+var getTemplate = function(file){
+    return readFile("template/" + file + ".html");
+};
+
+//Searches a template and replaces its variables by their values
+var populateTemplate = function(template, data){
+    return data.reduce(function(template, entry){
+        return template.split(entry.lookup).join(entry.value);
+    }, template);
+};
 // Retourne le texte HTML à afficher à l'utilisateur pour répondre au
 // sondage demandé.
 //
@@ -131,7 +143,7 @@ var getCalendar = function (pollId) {
     if(poll == null) return false;
 
     var title = poll.title;
-    var table = getTable(poll);
+    var table = getCalTable(poll);
     var url = hostUrl + poll.id;
 
     //Variables in calendar template and their actual values
@@ -144,20 +156,8 @@ var getCalendar = function (pollId) {
     return populateTemplate(calendar, data);
 };
 
-//returns a template's HTML as a string
-var getTemplate = function(file){
-    return readFile("template/" + file + ".html");
-};
-
-//Searches a template and replaces its variables by their values
-var populateTemplate = function(template, data){
-    return data.reduce(function(template, entry){
-        return template.split(entry.lookup).join(entry.value);
-    }, template);
-};
-
-//Produces the HTML for the poll input table
-var getTable = function(poll){
+//Produces the HTML for the calendar input table
+var getCalTable = function(poll){
     var nbDays = getElapsedDays(poll.dateStart, poll.dateEnd) + 1;
     var nbHours = getElapsedTime(poll.timeStart, poll.timeEnd) + 1;
 
@@ -170,23 +170,32 @@ var getTable = function(poll){
     // ..>
 
     //<table>HERE</table>
-        table += getTableRows(nbDays, nbHours, poll.dateStart, poll.timeStart);
+        table += getCalRows(nbDays, nbHours, poll.dateStart, poll.timeStart);
 
     //... </table>
         table += "</table>";
 
     return table;
 };
-var getTableRows = function(nbDays, nbHours, dateStart, timeStart){
+//Produces the all calendar table rows including header
+var getCalRows = function(nbDays, nbHours, dateStart, timeStart){
     var rows = [];
-    rows.push(getTableHeader(nbDays, dateStart));
+    rows.push(getCalHeader(nbDays, dateStart));
     for(var i = 0; i < nbHours; i++){
-        rows.push(getTableRow(nbDays, timeStart, i));
+        rows.push(getCalRow(nbDays, timeStart, i));
     }
     return rows.join("");
 };
-
-var getTableHeader = function(nbDays, dateStart){
+//Produces a single calendar table row
+var getCalRow = function(nbDays, timeStart, i){
+    var row = "<tr><th>" + (+timeStart + i) + "h</th>";
+    for(var j = 0; j < nbDays; j++){
+        row += "<td id='"+j+"-"+i  +"'></td>";
+    }
+    return row;
+};
+//Produces the calendar table header 
+var getCalHeader = function(nbDays, dateStart){
     var header = "<tr><th></th>";
     for(var i = 0; i < nbDays; i++){
         var date = new Date(dateStart).addDays(i);
@@ -199,12 +208,33 @@ var getTableHeader = function(nbDays, dateStart){
     return header;
 };
 
-var getTableRow = function(nbDays, timeStart, i){
-    var row = "<tr><th>" + (+timeStart + i) + "h</th>";
-    for(var j = 0; j < nbDays; j++){
-        row += "<td id='"+j+"-"+i  +"'></td>";
-    }
-    return row;
+var getResults = function (pollId) {
+    var poll = getPoll(pollId);
+    if(poll == null) return false; //poll not found
+    
+    var title = poll.title;
+    var table = getResultsTable(poll);
+    var url = hostUrl + poll.id;
+    var legend = getLegend(poll);
+
+    //Variables in calendar template and their actual values
+    var data = [
+        {lookup: "{{titre}}",   value: title},
+        {lookup: "{{table}}",   value: table},
+        {lookup: "{{url}}",     value: url},
+        {lookup: "{{legende}}", value: legend}
+    ];
+
+    
+    var results = getTemplate("results");
+    return populateTemplate(results, data);
+};
+
+var getResultsTable = function(poll){
+
+};
+var getLegend = function(){
+
 };
 
 //https://stackoverflow.com/questions/563406/add-days-to-javascript-date
@@ -212,16 +242,8 @@ Date.prototype.addDays = function(days) {
     var date = new Date(this.valueOf());
     date.setDate(date.getDate() + days);
     return date;
-}
-//------------------------------------------------------------------------------
-// Retourne le texte HTML à afficher à l'utilisateur pour voir les
-// résultats du sondage demandé
-//
-// Doit retourner false si le calendrier demandé n'existe pas
-var getResults = function (sondageId) {
-    // TODO
-    return 'Resultats du sondage <b>' + sondageId + '</b> (TODO)';
 };
+//------------------------------------------------------------------------------
 
 // Crée un sondage à partir des informations entrées
 //
@@ -244,7 +266,8 @@ var addPoll = function(title, id, dateStart, dateEnd, timeStart, timeEnd){
        dateStart: dateStart,
        dateEnd: dateEnd,
        timeStart: timeStart,
-       timeEnd: timeEnd
+       timeEnd: timeEnd,
+       participants: []
     });
 };
 //Retrieve information from saved poll
@@ -311,13 +334,11 @@ var test = function(){
     ) console.log("isValidID Failed!");
 };
 
-// Ajoute un participant et ses disponibilités aux résultats d'un
-// sondage. Les disponibilités sont envoyées au format textuel
-// fourni par la fonction compacterDisponibilites() de public/calendar.js
-//
-// Cette fonction ne retourne rien
-var ajouterParticipant = function(sondageId, nom, disponibilites) {
-    console.log(sondageId + " " + nom + " " + disponibilites);
+var ajouterParticipant = function(pollId, name, availabilities) {
+    var poll = getPoll(pollId);
+    if(poll != null){ //poll was found
+        poll.participants.push({name: name, availabilities: availabilities});
+    }
 };
 
 // Génère la `i`ème couleur parmi un nombre total `total` au format
