@@ -2,6 +2,7 @@
 //ID allows empty strings? Min length
 //Dates not before today?
 //creerSondage/MILLIS_PER_DAY renaming
+//If minMax ==
 
 'use strict';
 
@@ -246,18 +247,26 @@ var getResultsTable = function(poll){
 };
 //Produces the all calendar table rows including header
 var getResRows = function(nbDays, nbHours, dateStart, timeStart, participants){
+    var minMax = getMinMaxStats(participants);
+    console.log(minMax);
     var rows = [];
+
     rows.push(getResHeader(nbDays, dateStart));
+
     for(var i = 0; i < nbHours; i++){
-        rows.push(getResRow(nbDays, timeStart, i, participants));
+        rows.push(getResRow(nbDays, timeStart, i, participants, minMax));
     }
+
     return rows.join("");
 };
 //Produces a single calendar table row
-var getResRow = function(nbDays, timeStart, i, participants){
+var getResRow = function(nbDays, timeStart, i, participants, minMax){
     var row = "<tr><th>" + (+timeStart + i) + "h</th>";
     for(var j = 0; j < nbDays; j++){
-        row += "<td>" + addColorIndicators(i,j,nbDays,participants) + "</td>";
+        row += "<td " + 
+        getMinMaxClass(minMax, i, j, nbDays) +
+        ">" +
+        addColorIndicators(i,j,nbDays,participants) + "</td>";
     }
     return row;
 };
@@ -293,6 +302,57 @@ var getLegend = function(poll){
     });
     legend += "</ul>";
     return legend;
+};
+
+//Returns cells with min and max participations
+var getMinMaxStats = function(participants){
+    var stats = {
+        min: {nb:1/0,  pos:[]},
+        max: {nb:-1/0, pos:[]}
+    };
+
+    var nbOfCells = participants[0].availabilities.length;
+
+    for(var i = 0; i < nbOfCells; i++){
+        var count = 0;
+        participants.forEach(function(p){
+            count += +p.availabilities[i];
+        });
+        //Min Checks
+        if(count < stats.min.nb){
+            stats.min.nb = count;
+            stats.min.pos = [i];
+        }
+        else if(count == stats.min.nb){
+            stats.min.pos.push(i);
+        }
+        //Max Checks
+        if(count > stats.max.nb){
+            stats.max.nb = count;
+            stats.max.pos = [i];
+        }
+        else if(count == stats.max.nb){
+            stats.max.pos.push(i);
+        }
+    }
+    return stats;
+};
+var getMinMaxClass = function(stats, i, j, nbDays){
+    var currentPos = i* (+nbDays) + j;
+
+    //Check if min
+    for(var k = 0; k < stats.min.pos.length; k++){
+        if(stats.min.pos[k] == currentPos)
+            return "class='min'";
+    }
+
+    //Check if max
+    for(var k = 0; k < stats.max.pos.length; k++){
+        if(stats.max.pos[k] == currentPos)
+            return "class='max'";
+    }
+
+    return ""; //Was neither min nor max
 };
 
 //Returns true if a participant was available for that time period
