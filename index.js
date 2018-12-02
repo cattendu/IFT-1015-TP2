@@ -115,7 +115,7 @@ var getIndex = function (replacements) {
 
 var polls = [];
 
-var mois = [
+var months = [
     'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
     'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Dec'
 ];
@@ -131,12 +131,12 @@ var getCalendar = function (pollId) {
     if(poll == null) return false;
 
     var title = poll.title;
-    //var table = getTable(poll);
+    var table = getTable(poll);
     var url = hostUrl + poll.id;
 
     var data = [
         {lookup:"{{titre}}", replacement:title},
-        {lookup:"{{table}}", replacement:"table"},
+        {lookup:"{{table}}", replacement:table},
         {lookup:"{{url}}", replacement:url},
     ];
     var calendar = getTemplate("calendar");
@@ -153,19 +153,61 @@ var populateTemplate = function(template, data){
     }, template);
 };
 var getTable = function(poll){
-    //var nbHours
-    //var nbDays = poll;
-    /*var table = `<table id='calendrier'
-                    onmousedown="onClick(event)"
-                    onmouseover="onMove(event)"
-                    data-nbjours="6"
-                    data-nbheures="11">
+    var nbDays = getElapsedDays(poll.dateStart, poll.dateEnd) + 1;
+    var nbHours = getElapsedTime(poll.timeStart, poll.timeEnd) + 1;
 
-    `*/
+    //<table ...
+    var table  = '<table id="calendrier"';
+        table += 'onmousedown="onClick(event)"';
+        table += 'onmouseover="onMove(event)"';
+        table += 'data-nbjours="' + nbDays + '"';
+        table += 'data-nbheures="' + nbHours + '">';
+    // ..>
 
+    //<table>HERE</table>
+        table += getTableRows(nbDays, nbHours, poll.dateStart, poll.timeStart);
+
+    //... </table>
+        table += "</table>";
 
     return table;
 };
+var getTableRows = function(nbDays, nbHours, dateStart, timeStart){
+    var rows = [];
+    rows.push(getTableHeader(nbDays, dateStart));
+    for(var i = 0; i < nbHours; i++){
+        rows.push(getTableRow(nbDays, timeStart, i));
+    }
+    return rows.join("");
+};
+
+var getTableHeader = function(nbDays, dateStart){
+    var header = "<tr><th></th>";
+    for(var i = 0; i < nbDays; i++){
+        var date = new Date(dateStart).addDays(i);
+        var day = date.getUTCDate();
+        var month = months[date.getUTCMonth()];
+        header += "<th>" + day + " " + month + "</th>";
+    }
+    header += "</tr>";
+
+    return header;
+};
+
+var getTableRow = function(nbDays, timeStart, i){
+    var row = "<tr><th>" + (+timeStart + i) + "h</th>";
+    for(var j = 0; j < nbDays; j++){
+        row += "<td id='"+j+"-"+i  +"'></td>";
+    }
+    return row;
+};
+
+//https://stackoverflow.com/questions/563406/add-days-to-javascript-date
+Date.prototype.addDays = function(days) {
+    var date = new Date(this.valueOf());
+    date.setDate(date.getDate() + days);
+    return date;
+}
 //------------------------------------------------------------------------------
 // Retourne le texte HTML à afficher à l'utilisateur pour voir les
 // résultats du sondage demandé
@@ -234,20 +276,20 @@ var isSpecial = function(char){
 };
 var isValidDate = function(start, end){
     var maxDays = 30; //max poll length is 30 days
-    var elapsed = daysElapsed(start, end);
+    var elapsed = getElapsedDays(start, end);
     return elapsed >= 0 && elapsed < maxDays;
 };
 var isValidTime = function(start, end){
     return +start <= +end;
 };
 //number of elapsed days between two dates
-var daysElapsed = function(start, end){
+var getElapsedDays = function(start, end){
     var dateStart = new Date(start);
     var dateEnd = new Date(end);
     return (dateEnd-dateStart)/MILLIS_PER_DAY;
 };
 //number of elapsed hours between two times
-var timeElapsed = function(start, end){
+var getElapsedTime = function(start, end){
     return end - start;
 };
 //------------------------------------------------------------------------------
