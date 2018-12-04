@@ -1,9 +1,4 @@
-//Questions for TP2:
-//ID allows empty strings? Min length
-//Dates not before today?
-//creerSondage/MILLIS_PER_DAY renaming
-//If minMax ==
-
+//.getDate() / setDate()
 'use strict';
 
 var http = require("http");
@@ -181,17 +176,20 @@ var getCalTable = function(poll){
 //Produces the all calendar table rows including header
 var getCalRows = function(nbDays, nbHours, dateStart, timeStart){
     var rows = [];
+
     rows.push(getCalHeader(nbDays, dateStart));
+    
     for(var i = 0; i < nbHours; i++){
         rows.push(getCalRow(nbDays, timeStart, i));
     }
+    
     return rows.join("");
 };
 //Produces a single calendar table row
 var getCalRow = function(nbDays, timeStart, i){
     var row = "<tr><th>" + (+timeStart + i) + "h</th>";
     for(var j = 0; j < nbDays; j++){
-        row += "<td id='"+j+"-"+i  +"'></td>";
+        row += "<td id='"+j+"-"+i+"'></td>";
     }
     return row;
 };
@@ -248,7 +246,6 @@ var getResultsTable = function(poll){
 //Produces the all calendar table rows including header
 var getResRows = function(nbDays, nbHours, dateStart, timeStart, participants){
     var minMax = getMinMaxStats(participants);
-    console.log(minMax);
     var rows = [];
 
     rows.push(getResHeader(nbDays, dateStart));
@@ -339,17 +336,17 @@ var getMinMaxStats = function(participants){
 };
 var getMinMaxClass = function(stats, i, j, nbDays){
     var currentPos = i* (+nbDays) + j;
+    
+    //Check if max
+    for(var k = 0; k < stats.max.pos.length; k++){
+        if(stats.max.pos[k] == currentPos)
+            return "class='max'";
+    }
 
     //Check if min
     for(var k = 0; k < stats.min.pos.length; k++){
         if(stats.min.pos[k] == currentPos)
             return "class='min'";
-    }
-
-    //Check if max
-    for(var k = 0; k < stats.max.pos.length; k++){
-        if(stats.max.pos[k] == currentPos)
-            return "class='max'";
     }
 
     return ""; //Was neither min nor max
@@ -444,6 +441,7 @@ var getElapsedTime = function(start, end){
     return end - start;
 };
 //------------------------------------------------------------------------------
+//Unit test
 var test = function(){
     //isValidID
     if(
@@ -472,10 +470,16 @@ var ajouterParticipant = function(pollId, name, availabilities) {
 // commence en rouge, qui passe par toutes les autres couleurs et qui
 // revient à rouge.
 var genColor = function(i, nbColors) {
-    var h = i*6/nbColors;
-    var x = i%2 ? "00" : "B7";
-    var c = "B7";
+    //Calculate values
+    var h = (i*360/nbColors)/60;
+    var c = 0.7*255;
+    var x = c*(1-Math.abs(h%2-1));
 
+    //Convert to hex
+    c = Math.floor(c).toString(16);
+    x = x == 0 ? "00" : Math.floor(x).toString(16);
+
+    //Return color
     switch(Math.floor(h)){
         case 0:  return "#" + c + x + "00";
         case 1:  return "#" + x + c + "00";
@@ -485,7 +489,7 @@ var genColor = function(i, nbColors) {
         case 5:  return "#" + c + "00" + x;
         default: return "#000000";
     }
-};
+};  
 
 /*
  * Création du serveur HTTP
@@ -558,5 +562,3 @@ http.createServer(function (requete, reponse) {
     sendPage(reponse, doc);
 
 }).listen(port);
-
-test();
