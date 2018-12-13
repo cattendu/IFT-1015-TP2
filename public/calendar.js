@@ -1,64 +1,62 @@
+/************************************ TP2 **************************************
+    Class: IFT-1015
+    Authors:
+        Wassime Seddiki, 20120146
+        Charles Attendu, 1005236
+    Date: 14-12-2018
+*******************************************************************************/
+
 'use strict';
 
-//2D array keeping track of user's availabilities. 0: unavailable, 1: available
+//Array keeping track of user's availabilities. 0: unavailable, 1: available
 var availArr;
+//Used to toggle cells availabilities with mouse click.
+var isAvailable = false;
 
 document.addEventListener('DOMContentLoaded', function() {
     var cal = document.getElementById("calendar");
-    var nbHours = cal.dataset.nbhours;
-    var nbDays = cal.dataset.nbdays;
+    var nbHours = +cal.dataset.nbhours;
+    var nbDays = +cal.dataset.nbdays;
 
-    //Keeps track of the time periods when the user is available
-    availArr = generate2DArray(nbDays, nbHours);
+    //time periods when the user is available
+    availArr = new Array(nbHours*nbDays).fill(false);
 });
 
-//Generates a 2D array initialized with the value zero
-var generate2DArray = function(cols, rows){
-    var arr = new Array(+rows)
-    .fill(null); //fill with null because undefined will be skipped by map()
-    
-    //Fill 2D array with zeros
-    return arr.map(function(){
-        return new Array(+cols).fill(0);
-    });
-};
-
+//Set isAvailable state and clicked cell availability
 function onClick(event) {
     var t = event.target;
-    var pos = getCellPos(t);
 
-    if(pos != null){ //User clicked on a calendar cell
-        //Toggle calendar cell between check mark and empty string
-        t.innerHTML = t.innerHTML == "" ? "&#10003" : "";
-        //Toggle recorded availability between 0 and 1
-        availArr[pos.x][pos.y] = availArr[pos.x][pos.y] == 0 ? 1 : 0;
+    if(t.className == "cell"){
+        //set availability according to clicked cell
+        isAvailable = !availArr[t.id];
+        setAvailability(t);
     }
 }
 
-//Get the position of a calendar cell element based on its id;
-//Return null if the element is not a calendar cell
-//Calendar cells' id are of format: x-y where x and y are integers
-var getCellPos = function(elem){
-    var id = elem.id.split("-");
-    if(id.length != 2) return null; //id format is wrong: not a calendar cell
-
-    var hour = +id[0]; //Extract hour position based on id
-    var day  = +id[1]; //Extract day position based on id
-
-    if(!(day == day && hour == hour)) //not an integer: not a calendar cell
-        return null;
-
-    return {x: day, y: hour};
-};
-
+//Set cell availability if mouse is down
 function onMove(event) {
-    // TODO
     var t = event.target;
-    var id = t.id;
+
+    if(event.buttons == 1 && t.className == "cell"){
+        setAvailability(t);
+    }
 }
 
-var compacterDisponibilites = function() {
-    return availArr.map(function(row){
-        return row.join("");
+//Sets availability in data array and in the html table
+var setAvailability = function(cell){
+    var cellIndex = cell.id;
+    //set calendar cell availability visual representation
+    cell.innerHTML = isAvailable ? "&#10003" : "";
+    //set availability data
+    availArr[cellIndex] = isAvailable;
+};
+
+// *****************************************************
+// ****          COMPACTER DISPONIBILITES           ****
+// *****************************************************
+//returns the availability array as a string of ones dans zeros
+var compactAvailabilities = function() {
+    return availArr.map(function(available){
+        return available ? "1" : "0";
     }).join("");
 };

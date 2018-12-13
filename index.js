@@ -1,4 +1,11 @@
-//.getDate() / setDate()
+/************************************ TP2 **************************************
+    Class: IFT-1015
+    Authors:
+        Wassime Seddiki, 20120146
+        Charles Attendu, 1005236
+    Date: 14-12-2018
+*******************************************************************************/
+
 'use strict';
 
 var http = require("http");
@@ -65,7 +72,7 @@ var sendPage = function (reponse, page) {
 
 var indexQuery = function (query) {
 
-    var resultat = { exists: false, id: null };
+    var resultat = { exists: false, id: null, error: null };
 
     if (query !== null) {
 
@@ -82,6 +89,12 @@ var indexQuery = function (query) {
         if (resultat.exists) {
             resultat.id = query.id;
         }
+        else{
+            resultat.error = getErrorCode(
+                query.titre, query.id,
+                query.dateDebut, query.dateFin,
+                query.heureDebut, query.heureFin);
+        }
     }
 
     return resultat;
@@ -91,69 +104,89 @@ var calQuery = function (id, query) {
     if (query !== null) {
         query = querystring.parse(query);
         // query = { nom: ..., disponibilites: ... }
-        ajouterParticipant(id, query.nom, query.disponibilites);
+        addParticipant(id, query.nom, query.disponibilites);
         return true;
     }
     return false;
 };
 
-var getIndex = function (replacements) {
+//MODIFIED FOR BONUS POINTS
+var getIndex = function (error) {
+    //Retrieve base index template and replace error msg
+    var page = getTemplate("index");
+    var data = [
+        {lookup: "{{error}}", value: getErrorMsg(error)}
+    ];
+    page = populateTemplate(page, data);
+
     return {
         status: 200,
-        data: readFile('template/index.html'),
+        data: page,
         type: 'text/html'
     };
 };
 
 //------------------------------------------------------------------------------
-//----------------------------- TP2 BEGIN --------------------------------------
+//--------------------------------- TP2 BEGIN ----------------------------------
 //------------------------------------------------------------------------------
 
-var polls = [];
+//------------------------------ Global variables ------------------------------
+var polls = []; //Keeps track of all user created polls
 
-var months = [
+var months = [ //convert month index to string equivalent
     'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
     'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Dec'
 ];
 
-var MILLIS_PER_DAY = (24 * 60 * 60 * 1000);
+var MILLIS_PER_DAY = (24 * 60 * 60 * 1000); //nb of milliseconds in a day
+//------------------------------ Global variables ------------------------------
 
-//------------------------------------------------------------------------------
+//----------------------------- Template utilities -----------------------------
 //returns a template's HTML as a string
 var getTemplate = function(file){
     return readFile("template/" + file + ".html");
 };
 
-//Searches a template and replaces its variables by their values
+//Replaces variables inside a template by their actual values
 var populateTemplate = function(template, data){
     return data.reduce(function(template, entry){
         return template.split(entry.lookup).join(entry.value);
     }, template);
 };
-// Retourne le texte HTML à afficher à l'utilisateur pour répondre au
-// sondage demandé.
-//
-// Doit retourner false si le calendrier demandé n'existe pas
+
+//Add days to a date
+//https://stackoverflow.com/questions/563406/add-days-to-javascript-date
+Date.prototype.addDays = function(days) {
+    var date = new Date(this.valueOf());
+    date.setDate(date.getDate() + days);
+    return date;
+};
+//--------------------------- Template utilities -------------------------------
+
+//--------------------------- Calendar template --------------------------------
+//Returns the html to display as text; return false if poll does not exist
 var getCalendar = function (pollId) {
     var poll = getPoll(pollId);
-    if(poll == null) return false;
+    if(poll == null) return false; //poll was not found
 
+    //setup variables to replace in template
     var title = poll.title;
-    var table = getCalTable(poll);
+    var table = getCalendarTable(poll);
     var url = hostUrl + poll.id;
 
-    //Variables in calendar template and their actual values
+    //associate lookup keyword with their corresponding replacement value
     var data = [
         {lookup: "{{titre}}", value: title},
         {lookup: "{{table}}", value: table},
         {lookup: "{{url}}"  , value: url}
     ];
-    var calendar = getTemplate("calendar");
-    return populateTemplate(calendar, data);
+
+    var calendar = getTemplate("calendar"); //retrieve template
+    return populateTemplate(calendar, data); //replace variables by their value
 };
 
 //Produces the HTML for the calendar input table
-var getCalTable = function(poll){
+var getCalendarTable = function(poll){
     var nbDays = getElapsedDays(poll.dateStart, poll.dateEnd) + 1;
     var nbHours = getElapsedTime(poll.timeStart, poll.timeEnd) + 1;
 
@@ -173,30 +206,28 @@ var getCalTable = function(poll){
 
     return table;
 };
-//Produces the all calendar table rows including header
-var getCalRows = function(nbDays, nbHours, dateStart, timeStart){
-    var rows = [];
 
-    rows.push(getCalHeader(nbDays, dateStart));
-    
-    for(var i = 0; i < nbHours; i++){
-        rows.push(getCalRow(nbDays, timeStart, i));
+//Produces the all calendar table rows including header
+var getCalRows = function(nbCols, nbRows, dateStart, timeStart){
+    var rows = getTableHeader(nbCols, dateStart);//header row
+
+    //rows with participation data
+    var cellId = 0;
+    for(var i = 0; i < nbRows; i++){
+        var row = "<tr><th>" + (timeStart + i) + "h</th>";
+        for(var j = 0; j < nbCols; j++){
+            row += "<td class='cell' id='" + cellId++ +"'></td>";
+        }
+        rows += row;
     }
-    
-    return rows.join("");
+
+    return rows;
 };
-//Produces a single calendar table row
-var getCalRow = function(nbDays, timeStart, i){
-    var row = "<tr><th>" + (+timeStart + i) + "h</th>";
-    for(var j = 0; j < nbDays; j++){
-        row += "<td id='"+j+"-"+i+"'></td>";
-    }
-    return row;
-};
-//Produces the calendar table header 
-var getCalHeader = function(nbDays, dateStart){
+
+//Produces the table header 
+var getTableHeader = function(nbCols, dateStart){
     var header = "<tr><th></th>";
-    for(var i = 0; i < nbDays; i++){
+    for(var i = 0; i < nbCols; i++){
         var date = new Date(dateStart).addDays(i);
         var day = date.getUTCDate();
         var month = months[date.getUTCMonth()];
@@ -206,17 +237,20 @@ var getCalHeader = function(nbDays, dateStart){
 
     return header;
 };
-
+//--------------------------- Calendar template --------------------------------
+//--------------------------- Results template ---------------------------------
+//Returns the html to display as text; return false if poll does not exist
 var getResults = function (pollId) {
     var poll = getPoll(pollId);
     if(poll == null) return false; //poll not found
-    
+
+    //setup variables to replace in template
     var title = poll.title;
     var table = getResultsTable(poll);
     var url = hostUrl + poll.id;
     var legend = getLegend(poll);
 
-    //Variables in results template and their actual values
+    //associate lookup keyword with their corresponding replacement value
     var data = [
         {lookup: "{{titre}}",   value: title},
         {lookup: "{{table}}",   value: table},
@@ -224,10 +258,11 @@ var getResults = function (pollId) {
         {lookup: "{{legende}}", value: legend}
     ];
 
-    var results = getTemplate("results");
-    return populateTemplate(results, data);
+    var results = getTemplate("results"); //retrieve template
+    return populateTemplate(results, data); //replace variables by their values
 };
 
+//Produces the HTML for the results table
 var getResultsTable = function(poll){
     var nbDays = getElapsedDays(poll.dateStart, poll.dateEnd) + 1;
     var nbHours = getElapsedTime(poll.timeStart, poll.timeEnd) + 1;
@@ -243,54 +278,44 @@ var getResultsTable = function(poll){
 
     return table;
 };
-//Produces the all calendar table rows including header
-var getResRows = function(nbDays, nbHours, dateStart, timeStart, participants){
-    var minMax = getMinMaxStats(participants);
+
+//Produces the all result table rows including header
+var getResRows = function(nbCols, nbRows, dateStart, timeStart, participants){
+    var stats = getMinMaxStats(participants, nbCols*nbRows);
     var rows = [];
 
-    rows.push(getResHeader(nbDays, dateStart));
+    //HTML Header row
+    rows.push(getTableHeader(nbCols, dateStart));
 
-    for(var i = 0; i < nbHours; i++){
-        rows.push(getResRow(nbDays, timeStart, i, participants, minMax));
+    //HTML Table Data rows
+    var cellIndex = 0; //current time cell being investigated
+    for(var i = 0; i < nbRows; i++){
+        var row = "<tr><th>" + (+timeStart + i) + "h</th>";
+        for(var j = 0; j < nbCols; j++, cellIndex++){
+            row += "<td " + getMinMaxClass(cellIndex, stats, participants) + ">" +
+            getAvailIndicators(cellIndex, participants) + "</td>";
+        }
+        rows.push(row);
     }
 
     return rows.join("");
 };
-//Produces a single calendar table row
-var getResRow = function(nbDays, timeStart, i, participants, minMax){
-    var row = "<tr><th>" + (+timeStart + i) + "h</th>";
-    for(var j = 0; j < nbDays; j++){
-        row += "<td " + 
-        getMinMaxClass(minMax, i, j, nbDays) +
-        ">" +
-        addColorIndicators(i,j,nbDays,participants) + "</td>";
-    }
-    return row;
-};
-//Produces the calendar table header 
-var getResHeader = function(nbDays, dateStart){
-    var header = "<tr><th></th>";
-    for(var i = 0; i < nbDays; i++){
-        var date = new Date(dateStart).addDays(i);
-        var day = date.getUTCDate();
-        var month = months[date.getUTCMonth()];
-        header += "<th>" + day + " " + month + "</th>";
-    }
-    header += "</tr>";
 
-    return header;
-};
-var addColorIndicators = function(i,j,nbDays,participants){
-    var colors = "";
-
-    participants.forEach(function(p,k){
-        if(checkAvailability(i,j,nbDays, p.availabilities)){
-            var color = genColor(k, participants.length);
-            colors += "<span style='background-color: " + color + "; color:"+ color +"'>.</span>";
+//get the html to display the color bars indicating participants availabilities
+var getAvailIndicators = function(cellIndex, participants){
+    var colorIndicators = "";
+    //add color bar for each participant available during this time cell
+    participants.forEach(function(p, i){
+        if(p.availabilities[cellIndex] == "1"){ //participant is available
+            var color = genColor(i, participants.length);
+            colorIndicators += "<span style='background-color: " +
+                                color + "; color:"+ color +"'>.</span>";
         }
     });
-    return colors;
+    return colorIndicators;
 };
+
+//Get html for legend of the result's table
 var getLegend = function(poll){
     var legend = "<ul>";
     poll.participants.map(function(p,i){
@@ -300,178 +325,13 @@ var getLegend = function(poll){
     legend += "</ul>";
     return legend;
 };
+//--------------------------- Results template ---------------------------------
 
-//Returns cells with min and max participations
-var getMinMaxStats = function(participants){
-    var stats = {
-        min: {nb:1/0,  pos:[]},
-        max: {nb:-1/0, pos:[]}
-    };
-
-    var nbOfCells = participants[0].availabilities.length;
-
-    for(var i = 0; i < nbOfCells; i++){
-        var count = 0;
-        participants.forEach(function(p){
-            count += +p.availabilities[i];
-        });
-        //Min Checks
-        if(count < stats.min.nb){
-            stats.min.nb = count;
-            stats.min.pos = [i];
-        }
-        else if(count == stats.min.nb){
-            stats.min.pos.push(i);
-        }
-        //Max Checks
-        if(count > stats.max.nb){
-            stats.max.nb = count;
-            stats.max.pos = [i];
-        }
-        else if(count == stats.max.nb){
-            stats.max.pos.push(i);
-        }
-    }
-    return stats;
-};
-var getMinMaxClass = function(stats, i, j, nbDays){
-    var currentPos = i* (+nbDays) + j;
-    
-    //Check if max
-    for(var k = 0; k < stats.max.pos.length; k++){
-        if(stats.max.pos[k] == currentPos)
-            return "class='max'";
-    }
-
-    //Check if min
-    for(var k = 0; k < stats.min.pos.length; k++){
-        if(stats.min.pos[k] == currentPos)
-            return "class='min'";
-    }
-
-    return ""; //Was neither min nor max
-};
-
-//Returns true if a participant was available for that time period
-var checkAvailability = function(i,j, nbDays, participation){
-    return participation.charAt(i*nbDays + j) == "1";
-};
-
-//https://stackoverflow.com/questions/563406/add-days-to-javascript-date
-Date.prototype.addDays = function(days) {
-    var date = new Date(this.valueOf());
-    date.setDate(date.getDate() + days);
-    return date;
-};
-//------------------------------------------------------------------------------
-
-// Crée un sondage à partir des informations entrées
-//
-// Doit retourner false si les informations ne sont pas valides, ou
-// true si le sondage a été créé correctement.
-var createPoll = function(title, id, dateStart, dateEnd, timeStart, timeEnd) {
-    if(isValidId(id) &&
-       isValidDate(dateStart, dateEnd) &&
-       isValidTime(timeStart, timeEnd)){
-           addPoll(title, id, dateStart, dateEnd, timeStart, timeEnd);
-           return true;
-       }
-    return false;
-};
-//Adds new poll to global variable polls
-var addPoll = function(title, id, dateStart, dateEnd, timeStart, timeEnd){
-    polls.push({
-       title: title,
-       id: id,
-       dateStart: dateStart,
-       dateEnd: dateEnd,
-       timeStart: timeStart,
-       timeEnd: timeEnd,
-       participants: []
-    });
-};
-//Retrieve information from saved poll
-var getPoll = function(id){
-    for(var i = 0; i < polls.length; i++){
-        if(polls[i].id == id) return polls[i];
-    }
-    return null;
-};
-//------------------------------------------------------------------------------
-//ID is valid if it contains only letters numbers and allowed special characters
-//Must be of length > 0
-var isValidId = function(id){
-    if(id.length == 0) return false;
-
-    for(var i = 0; i < id.length; i++){
-        var char = id.charAt(i);
-        if(isLetter(char) || isNumber(char) || isSpecial(char))
-            continue;
-        return false;
-    }
-    return true;
-};
-var isLetter = function(char){
-    return (char >= "a" && char <= "z") ||
-           (char >= "A" && char <= "Z");
-};
-var isNumber = function(char){
-    if(char == " ") return false; //space is converted to 0 by unary operator +
-    return +char == +char;
-};
-var isSpecial = function(char){
-    return char == "-";
-};
-var isValidDate = function(start, end){
-    var maxDays = 30; //max poll length is 30 days
-    var elapsed = getElapsedDays(start, end);
-    return elapsed >= 0 && elapsed < maxDays;
-};
-var isValidTime = function(start, end){
-    return +start <= +end;
-};
-//number of elapsed days between two dates
-var getElapsedDays = function(start, end){
-    var dateStart = new Date(start);
-    var dateEnd = new Date(end);
-    return (dateEnd-dateStart)/MILLIS_PER_DAY;
-};
-//number of elapsed hours between two times
-var getElapsedTime = function(start, end){
-    return end - start;
-};
-//------------------------------------------------------------------------------
-//Unit test
-var test = function(){
-    //isValidID
-    if(
-        !(
-        isValidId("") == false &&
-        isValidId(" ") == false &&
-        isValidId("%212") == false &&
-        isValidId("dsa dAA1") == false &&
-        isValidId("dD3-2aa") == true
-        )
-    ) console.log("isValidID Failed!");
-};
-
-var ajouterParticipant = function(pollId, name, availabilities) {
-    var poll = getPoll(pollId);
-    if(poll != null){ //poll was found
-        poll.participants.push({name: name, availabilities: availabilities});
-    }
-};
-
-// Génère la `i`ème couleur parmi un nombre total `total` au format
-// hexadécimal HTML
-//
-// Notez que pour un grand nombre de couleurs (ex.: 250), générer
-// toutes les couleurs et les afficher devrait donner un joli dégradé qui
-// commence en rouge, qui passe par toutes les autres couleurs et qui
-// revient à rouge.
+//--------------------------- Results Utitilies --------------------------------
+//Generates a color based on the number of participants
 var genColor = function(i, nbColors) {
     //Calculate values
-    var h = (i*360/nbColors)/60;
+    var h = (i*6/nbColors);
     var c = 0.7*255;
     var x = c*(1-Math.abs(h%2-1));
 
@@ -489,7 +349,199 @@ var genColor = function(i, nbColors) {
         case 5:  return "#" + c + "00" + x;
         default: return "#000000";
     }
-};  
+};
+
+//Find the cells with the min/max number of available participants
+var getMinMaxStats = function(participants, nbCells){
+    var min =  1/0; //init at +infinity
+    var max = -1/0; //init at -infinity
+
+    //Find the cell with min/max nb of available participants
+    for(var i = 0; i < nbCells; i++){
+        var nbAvail = 0;
+        participants.forEach(function(p){
+            nbAvail += +p.availabilities[i]; //0 or 1 depending on availability
+        });
+
+        min = Math.min(min, nbAvail); //update min
+        max = Math.max(max, nbAvail); //update max
+    }
+
+    return {min:min, max:max};
+};
+
+//Get the css class for a time cell if it has min/max participation
+var getMinMaxClass = function(cellIndex, stats, participants){
+    var nbAvail = 0;
+
+    //nb of available participants for a specific time cell
+    participants.forEach(function(p){
+        nbAvail += +p.availabilities[cellIndex];
+    });
+
+    if(nbAvail == stats.max) return "class='max'";
+    if(nbAvail == stats.min) return "class='min'";
+    return ""; //Was neither min nor max
+};
+//--------------------------- Results Utitilies --------------------------------
+
+//------------------------------ Poll controller -------------------------------
+// *****************************************************
+// ****                CREER SONDAGE                ****
+// *****************************************************
+//Creates a new poll; return true if creation was successful; else return false
+var createPoll = function(title, id, dateStart, dateEnd, timeStart, timeEnd) {
+    if (isValidId(id) &&
+        isUniqueId(id) && //BONUS: used for error messages
+        isValidDate(dateStart, dateEnd) &&
+        isValidTime(timeStart, timeEnd)){
+            //Adds new poll to global variable polls
+            polls.push({ 
+                title: title,
+                id: id,
+                dateStart: dateStart,
+                dateEnd: dateEnd,
+                timeStart: +timeStart,
+                timeEnd: +timeEnd,
+                participants: []
+            });
+            return true;
+        }
+    return false;
+};
+
+//Retrieve information from saved poll
+var getPoll = function(id){
+    for(var i = 0; i < polls.length; i++){
+        if(polls[i].id == id) return polls[i];
+    }
+    return null; //poll not founds
+};
+
+// *****************************************************
+// ****             AJOUTER PARTICIPANT             ****
+// *****************************************************
+//Adds a participant to a specific poll
+var addParticipant = function(pollId, name, availabilities) {
+    var poll = getPoll(pollId);
+    if(poll != null){ //poll was found
+        poll.participants.push({name: name, availabilities: availabilities});
+    }
+};
+//------------------------------ Poll controller -------------------------------
+
+//-------------------------- Poll creation validation --------------------------
+//ID is valid if it contains only letters numbers and allowed special characters
+//Must be of length > 0
+var isValidId = function(id){
+    if(id == undefined) return false;
+    if(id.length == 0) return false;
+
+    for(var i = 0; i < id.length; i++){
+        var char = id.charAt(i);
+        if(isLetter(char) || isDigit(char) || isSpecial(char))
+            continue;
+        return false;
+    }
+    return true;
+};
+
+//Checks if id is not already used by another poll
+var isUniqueId = function(id){
+    for(var i = 0; i < polls.length; i++){
+        if(polls[i].id == id) return false;
+    }
+    return true;
+};
+
+//char is a letter
+var isLetter = function(char){
+    return (char >= "a" && char <= "z") ||
+           (char >= "A" && char <= "Z");
+};
+
+//char is a digit
+var isDigit = function(char){
+    if(char == " ") return false; //space is converted to 0 by unary operator +
+    return +char == +char;
+};
+
+//char is one of the allowed special chracters
+var isSpecial = function(char){
+    return char == "-"; //only special char accepted is dash
+};
+
+//Checks if start date is before end date and within max nb of days allowed
+var isValidDate = function(start, end){
+    if(start == undefined || end == undefined) return false;
+
+    var maxDays = 30; //max poll length is 30 days
+    var elapsed = getElapsedDays(start, end);
+    return elapsed >= 0 && elapsed < maxDays;
+};
+
+//Checks if start time is before end time
+var isValidTime = function(start, end){
+    if(start == undefined || end == undefined) return false;
+
+    return +start <= +end;
+};
+
+//number of elapsed days between two dates
+var getElapsedDays = function(start, end){
+    var dateStart = new Date(start);
+    var dateEnd = new Date(end);
+    return Math.floor((dateEnd-dateStart)/MILLIS_PER_DAY);
+};
+
+//number of elapsed hours between two times
+var getElapsedTime = function(start, end){
+    return end - start;
+};
+//-------------------------- Poll creation validation --------------------------
+
+//-------------------------- BONUS: Error message ------------------------------
+var getErrorCode = function(title, id, dateStart, dateEnd, timeStart, timeEnd){
+    if(!isValidId(id))                   return 1;
+    if(!isUniqueId(id))                  return 2;
+    if(!isValidDate(dateStart, dateEnd)) return 3;
+    if(!isValidTime(timeStart, timeEnd)) return 4;
+                                         return 0;
+};
+var getErrorMsg = function(code){
+    if(code == null) return "";
+
+    var msg = "<div id='error' >";
+    switch(code){
+        case 1: msg += "Entrez un id valide!";
+                break;
+        case 2: msg += "Ce id est déjà utilisé par un autre sondage!";
+                break;
+        case 3: msg += "Entrez des dates valides!";
+                break;
+        case 4: msg += "Entrez des heures valides!";
+                break;
+        default: msg += "Votre formulaire comporte une erreur!";
+    }
+    msg += "</div>";
+    return msg;
+
+};
+//------------------------------- Error message --------------------------------
+
+//------------------------------------------------------------------------------
+//Unit test
+var test = function(){
+    var assert = require('assert');
+
+    assert(isValidId("") == false);
+    assert(isValidId(" ") == false);
+    assert(isValidId("%212") == false);
+    assert(isValidId("dsa dAA1") == false);
+    assert(isValidId("dD3-2aa") == true);
+
+};
+test();
 
 /*
  * Création du serveur HTTP
@@ -504,7 +556,6 @@ http.createServer(function (requete, reponse) {
         redirect(reponse, defaultPage, url.query);
         return;
     }
-
     var doc;
 
     if (url.pathname == defaultPage) {
@@ -514,11 +565,10 @@ http.createServer(function (requete, reponse) {
             redirect(reponse, res.id);
             return;
         } else {
-            doc = getIndex(res.data);
+            doc = getIndex(res.error);
         }
     } else {
         var parsedPath = pathParse(url.pathname);
-
         if (parsedPath.ext.length == 0) {
             var id;
 
@@ -526,7 +576,7 @@ http.createServer(function (requete, reponse) {
                 id = parsedPath.base;
 
                 if (calQuery(id, url.query)) {
-                    redirect(reponse, '/'+ id + '/results')
+                    redirect(reponse, '/'+ id + '/results');
                     return ;
                 }
 
@@ -558,7 +608,6 @@ http.createServer(function (requete, reponse) {
             doc = getDocument(url);
         }
     }
-
     sendPage(reponse, doc);
 
 }).listen(port);
