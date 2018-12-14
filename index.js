@@ -7,7 +7,7 @@
 *******************************************************************************/
 
 'use strict';
-
+var sanitizeHtml = require('sanitize-html');
 var http = require("http");
 var fs = require('fs');
 var urlParse = require('url').parse;
@@ -81,7 +81,7 @@ var indexQuery = function (query) {
             query.id.length > 0 && query.titre.length > 0) {
 
             resultat.exists = createPoll(
-                query.titre, query.id,
+                sanitizeHtml(query.titre), query.id, //BONUS: SANITIZE HERE
                 query.dateDebut, query.dateFin,
                 query.heureDebut, query.heureFin);
         }
@@ -103,8 +103,8 @@ var indexQuery = function (query) {
 var calQuery = function (id, query) {
     if (query !== null) {
         query = querystring.parse(query);
-        // query = { nom: ..., disponibilites: ... }
-        addParticipant(id, query.nom, query.disponibilites);
+        //BONUS: SANITIZE HERE
+        addParticipant(id, sanitizeHtml(query.nom), query.disponibilites);
         return true;
     }
     return false;
@@ -292,7 +292,7 @@ var getResRows = function(nbCols, nbRows, dateStart, timeStart, participants){
     for(var i = 0; i < nbRows; i++){
         var row = "<tr><th>" + (+timeStart + i) + "h</th>";
         for(var j = 0; j < nbCols; j++, cellIndex++){
-            row += "<td " + getMinMaxClass(cellIndex, stats, participants) + ">" +
+            row += "<td "+getMinMaxClass(cellIndex, stats, participants)+">"+
             getAvailIndicators(cellIndex, participants) + "</td>";
         }
         rows.push(row);
@@ -320,7 +320,7 @@ var getLegend = function(poll){
     var legend = "<ul>";
     poll.participants.map(function(p,i){
         var color = genColor(i, poll.participants.length);
-        legend += "<li style='background-color: " + color + "'>" + p.name + "</li>"; 
+        legend += "<li style='background-color: "+color+"'>"+p.name+"</li>"; 
     });
     legend += "</ul>";
     return legend;
