@@ -216,7 +216,7 @@ var getCalRows = function(nbCols, nbRows, dateStart, timeStart){
     for(var i = 0; i < nbRows; i++){
         var row = "<tr><th>" + (timeStart + i) + "h</th>";
         for(var j = 0; j < nbCols; j++){
-            row += "<td class='cell' id='" + cellId++ +"'></td>";
+            row += "<td class='timeCell' id='" + cellId++ +"'></td>";
         }
         rows += row;
     }
@@ -501,6 +501,7 @@ var getElapsedTime = function(start, end){
 //-------------------------- Poll creation validation --------------------------
 
 //-------------------------- BONUS: Error message ------------------------------
+//Returns an error code based on the error type when trying to add a new poll
 var getErrorCode = function(title, id, dateStart, dateEnd, timeStart, timeEnd){
     if(!isValidId(id))                   return 1;
     if(!isUniqueId(id))                  return 2;
@@ -508,6 +509,8 @@ var getErrorCode = function(title, id, dateStart, dateEnd, timeStart, timeEnd){
     if(!isValidTime(timeStart, timeEnd)) return 4;
                                          return 0;
 };
+
+//Converts an error code to its html element
 var getErrorMsg = function(code){
     if(code == null) return "";
 
@@ -529,19 +532,105 @@ var getErrorMsg = function(code){
 };
 //------------------------------- Error message --------------------------------
 
-//------------------------------------------------------------------------------
-//Unit test
-var test = function(){
-    var assert = require('assert');
+//--------------------------------- Unit tests ---------------------------------
+var assert = require('assert');
 
-    assert(isValidId("") == false);
-    assert(isValidId(" ") == false);
-    assert(isValidId("%212") == false);
-    assert(isValidId("dsa dAA1") == false);
-    assert(isValidId("dD3-2aa") == true);
+var test = function(){
+    testIsValidID();
+    testIsValidDate();
+    testIsValidTime();
+    testPopulateTemplate();
+    testGenColor();
+    testGetMinMaxStats();
+    testCompactAvailabilities();
+};
+
+var testIsValidID = function(){
+    assert(isValidId("") === false);
+    assert(isValidId(" ") === false);
+    assert(isValidId("%212") === false);
+    assert(isValidId("dsa dAA1") === false);
+    assert(isValidId("dD3-2aa") === true);
+};
+
+var testIsValidDate = function(){
+    assert(isValidDate("12-01-2018","12-01-2018") === true);
+    assert(isValidDate("12-01-2018","12-30-2018") === true);
+    assert(isValidDate("11-20-2018","12-01-2018") === true);
+    assert(isValidDate("12-01-2018","12-31-2018") === false);
+    assert(isValidDate("12-31-2018","12-30-2018") === false);
+};
+
+var testIsValidTime = function(){
+    assert(isValidTime("1","1") === true);
+    assert(isValidTime("1","5") === true);
+    assert(isValidTime("0","23") === true);
+    assert(isValidTime("7","6") === false);
+};
+
+var testPopulateTemplate = function(){
+    var template1 = "foo {{foo}} bar {{foo}}";
+    var template2 = "foo {{foo}} bar {{bar}}";
+    var data1 = [
+        {lookup: "{{foo}}", value: "test"}
+    ];
+    var data2 = [
+        {lookup: "{{foo}}", value: "test"},
+        {lookup: "{{bar}}", value: "testBar"}
+    ];
+
+    assert(populateTemplate(template1,data1) === "foo test bar test");
+    assert(populateTemplate(template1,data2) === "foo test bar test");
+    assert(populateTemplate(template2,data2) === "foo test bar testBar");
+};
+
+var testGenColor = function(){
+    assert(genColor(0,0) === "#000000");
+    assert(genColor(1,0) === "#000000");
+    assert(genColor(0,1) === "#b20000");
+    assert(genColor(2,5) === "#00b247");
+    assert(genColor(4,5) === "#8e00b2");
+};
+
+var testGetMinMaxStats = function(){
+    var participants1 = [
+        {name: "test",  availabilities: "0000"},
+    ];
+    var participants2 = [
+        {name: "test",  availabilities: "1000"},
+    ];
+    var participants3 = [
+        {name: "test1",  availabilities: "1111"},
+        {name: "test2",  availabilities: "1100"},
+        {name: "test3",  availabilities: "1000"},
+    ];
+    
+    assert(getMinMaxStats(participants1, 4).min === 0 &&
+           getMinMaxStats(participants1, 4).max === 0);
+    assert(getMinMaxStats(participants2, 4).min === 0 &&
+           getMinMaxStats(participants2, 4).max === 1);
+    assert(getMinMaxStats(participants3, 4).min === 1 &&
+           getMinMaxStats(participants3, 4).max === 3);
+};
+
+//This function is ran client side in calendar.js
+var testCompactAvailabilities = function(){
+    var compactAvailabilities = function(availArr) {
+        return availArr.reduce(function(compact, availability){
+            return compact + (availability ? "1" : "0");
+        },"");
+    };
+    var avail1 = [false, false, false, false];
+    var avail2 = [true, false, true, false];
+    var avail3 = [true, true];
+    assert(compactAvailabilities(avail1) === "0000");
+    assert(compactAvailabilities(avail2) === "1010");
+    assert(compactAvailabilities(avail3) === "11");
 
 };
+
 test();
+//--------------------------------- Unit tests ---------------------------------
 
 /*
  * Création du serveur HTTP

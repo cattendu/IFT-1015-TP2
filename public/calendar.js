@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function onClick(event) {
     var t = event.target;
 
-    if(t.className == "cell"){
+    if(t.className == "timeCell"){
         //set availability according to clicked cell
         isAvailable = !availArr[t.id];
         setAvailability(t);
@@ -37,7 +37,7 @@ function onClick(event) {
 function onMove(event) {
     var t = event.target;
 
-    if(event.buttons == 1 && t.className == "cell"){
+    if(event.buttons == 1 && t.className == "timeCell"){
         setAvailability(t);
     }
 }
@@ -56,7 +56,7 @@ var setAvailability = function(cell){
 // *****************************************************
 //returns the availability array as a string of ones dans zeros
 var compactAvailabilities = function() {
-    return availArr.map(function(available){
-        return available ? "1" : "0";
-    }).join("");
+    return availArr.reduce(function(compact, availability){
+        return compact + (availability ? "1" : "0");
+    },"");
 };
